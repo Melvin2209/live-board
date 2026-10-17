@@ -12,6 +12,7 @@ import {
   updateElement,
   type ElementType,
 } from "@/board/model";
+import { createUndoManager } from "@/board/history";
 import { BoardStore } from "@/board/store";
 import { screenToWorld, zoomAt, type Viewport } from "@/board/viewport";
 import { ElementShape, type ElementHandlers } from "./ElementShape";
@@ -44,6 +45,15 @@ export function BoardCanvas({ doc }: Props) {
   // collected together, so there is nothing to tear down here.
   const store = useMemo(() => new BoardStore(doc), [doc]);
   const elements = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
+  const undoManager = useMemo(() => createUndoManager(doc), [doc]);
+  const [history, setHistory] = useState({ canUndo: false, canRedo: false });
+
+  useEffect(() => {
+    const update = () => setHistory({ canUndo: undoManager.canUndo(), canRedo: undoManager.canRedo() });
+    const events = ["stack-item-added", "stack-item-popped", "stack-cleared"] as const;
+    events.forEach((name) => undoManager.on(name, update));
+    return () => events.forEach((name) => undoManager.off(name, update));
+  }, [undoManager]);
 
   const size = useWindowSize();
   const [tool, setTool] = useState<Tool>("select");
@@ -97,7 +107,11 @@ export function BoardCanvas({ doc }: Props) {
         setSelection([id]);
         setEditingId(id);
       },
-      onDragStart: (id) => bringToFront(doc, id),
+      onDragStart: (id) => {
+        // Start a fresh undo step: the whole drag will be undone at once.
+        undoManager.stopCapturing();
+        bringToFront(doc, id);
+      },
       onDragMove: (id, x, y) => {
         pendingDrag.current = { id, x, y };
         dragFrame.current ??= requestAnimationFrame(flushDrag);
@@ -108,7 +122,7 @@ export function BoardCanvas({ doc }: Props) {
         flushDrag();
       },
     }),
-    [doc, flushDrag],
+    [doc, flushDrag, undoManager],
   );
 
   /* ------------------------------ stage events ----------------------------- */
@@ -121,6 +135,7 @@ export function BoardCanvas({ doc }: Props) {
   const createAt = (type: ElementType) => {
     const p = pointerWorld();
     if (!p) return;
+    undoManager.stopCapturing(); // each discrete action is its own undo step
     const id = createElement(doc, { type, x: p.x - 80, y: p.y - (type === "text" ? 20 : 60) });
     setSelection([id]);
     setTool("select");
@@ -168,6 +183,7 @@ export function BoardCanvas({ doc }: Props) {
   }, [liveSelection, editingId, elements]);
 
   const onTransformEnd = () => {
+    undoManager.stopCapturing();
     // Konva resizes by scaling the node; we bake the scale into width/height
     // so the stored data stays simple (scale is always 1).
     for (const node of transformerRef.current?.nodes() ?? []) {
@@ -184,20 +200,31 @@ export function BoardCanvas({ doc }: Props) {
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
+      const mod = e.metaKey || e.ctrlKey;
+      const key = e.key.toLowerCase();
+      // Handled even inside the text editor: the textarea's native undo would
+      // not know about the shared Y.Text, so we route it to the UndoManager.
+      if (mod && (key === "z" || key === "y")) {
+        e.preventDefault();
+        if (key === "y" || e.shiftKey) undoManager.redo();
+        else undoManager.undo();
+        return;
+      }
       if (isTyping(e.target)) return;
       if ((e.key === "Delete" || e.key === "Backspace") && selectionRef.current.length) {
+        undoManager.stopCapturing();
         deleteElements(doc, selectionRef.current);
         setSelection([]);
       } else if (e.key === "Escape") {
         setSelection([]);
         setTool("select");
-      } else if (!e.metaKey && !e.ctrlKey && !e.altKey && TOOL_KEYS[e.key.toLowerCase()]) {
-        setTool(TOOL_KEYS[e.key.toLowerCase()]);
+      } else if (!mod && !e.altKey && TOOL_KEYS[key]) {
+        setTool(TOOL_KEYS[key]);
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [doc]);
+  }, [doc, undoManager]);
 
   /* -------------------------------- render --------------------------------- */
 
@@ -210,12 +237,21 @@ export function BoardCanvas({ doc }: Props) {
         tool={tool}
         onToolChange={setTool}
         selectedColor={selectedColor}
-        onColorChange={(color) => liveSelection.forEach((id) => updateElement(doc, id, { color }))}
-        onDelete={liveSelection.length ? () => (deleteElements(doc, liveSelection), setSelection([])) : undefined}
+        onColorChange={(color) => {
+          undoManager.stopCapturing();
+          liveSelection.forEach((id) => updateElement(doc, id, { color }));
+        }}
+        onDelete={() => {
+          undoManager.stopCapturing();
+          deleteElements(doc, liveSelection);
+          setSelection([]);
+        }}
         zoom={viewport.scale}
         onZoomIn={() => zoomBy(1.2)}
         onZoomOut={() => zoomBy(1 / 1.2)}
         onZoomReset={() => setViewport({ x: 0, y: 0, scale: 1 })}
+        onUndo={history.canUndo ? () => undoManager.undo() : undefined}
+        onRedo={history.canRedo ? () => undoManager.redo() : undefined}
       />
       <div className="element-count" data-testid="element-count">
         {elements.length} elements

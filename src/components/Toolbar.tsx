@@ -24,6 +24,9 @@ interface Props {
   onZoomIn: () => void;
   onZoomOut: () => void;
   onZoomReset: () => void;
+  /** Undefined when there is nothing to undo / redo. */
+  onUndo?: () => void;
+  onRedo?: () => void;
 }
 
 export function Toolbar(props: Props) {
@@ -65,6 +68,14 @@ export function Toolbar(props: Props) {
           )}
         </>
       )}
+
+      <span className="separator" />
+      <button type="button" title="Undo (Ctrl+Z)" data-testid="undo" disabled={!props.onUndo} onClick={props.onUndo}>
+        ↶
+      </button>
+      <button type="button" title="Redo (Ctrl+Shift+Z)" data-testid="redo" disabled={!props.onRedo} onClick={props.onRedo}>
+        ↷
+      </button>
 
       <span className="separator" />
       <button type="button" title="Zoom out" data-testid="zoom-out" onClick={props.onZoomOut}>
