@@ -21,9 +21,11 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "konva": "^10.9.0",
     "next": "^16.4.2",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
+    "react-konva": "^19.3.2",
     "yjs": "^13.6.33"
   },
   "devDependencies": {
