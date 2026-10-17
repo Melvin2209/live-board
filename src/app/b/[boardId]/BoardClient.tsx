@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { useBoardSession } from "@/collab/useBoardSession";
 import { loadUser, saveUser, type UserInfo } from "@/collab/user";
+import { ShareButton } from "@/components/ShareButton";
 import { TopBar } from "@/components/TopBar";
 
 // Konva needs `window`: render the canvas on the client only.
@@ -43,7 +44,11 @@ export function BoardClient({ boardId }: { boardId: string }) {
 
   return (
     <main>
-      {user && <TopBar boardId={boardId} user={user} onRename={rename} awareness={session?.provider.awareness} />}
+      {user && (
+        <TopBar boardId={boardId} user={user} onRename={rename} awareness={session?.provider.awareness}>
+          <ShareButton />
+        </TopBar>
+      )}
       {session && <BoardCanvas key={boardId} doc={session.doc} awareness={session.provider.awareness} />}
     </main>
   );

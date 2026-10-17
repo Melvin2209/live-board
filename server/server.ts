@@ -1,6 +1,7 @@
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import { WebSocketServer, type WebSocket } from "ws";
+import { isValidBoardId } from "../src/board/ids";
 import { BoardPersistence } from "./persistence";
 import { Room } from "./room";
 
@@ -14,9 +15,6 @@ export interface RunningServer {
   port: number;
   close: () => Promise<void>;
 }
-
-/** Board ids come from the URL: keep them short and URL-safe. */
-export const BOARD_ID_PATTERN = /^[a-z0-9-]{1,64}$/;
 
 const HEARTBEAT_MS = 30_000;
 
@@ -37,8 +35,9 @@ export function startServer({ port, dbPath, saveDebounceMs = 1000 }: ServerOptio
 
   // The y-websocket client connects to ws://host/<boardId>.
   httpServer.on("upgrade", (req, socket, head) => {
-    const boardId = decodeURIComponent(new URL(req.url ?? "/", "http://x").pathname.slice(1));
-    if (!BOARD_ID_PATTERN.test(boardId)) {
+    // Valid ids never contain escaped characters, so no decoding is needed.
+    const boardId = new URL(req.url ?? "/", "http://x").pathname.slice(1);
+    if (!isValidBoardId(boardId)) {
       socket.write("HTTP/1.1 400 Bad Request\r\n\r\n");
       socket.destroy();
       return;
