@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { Layer, Stage, Transformer } from "react-konva";
 import type Konva from "konva";
+import type { Awareness } from "y-protocols/awareness";
 import type * as Y from "yjs";
 import {
   bringToFront,
@@ -15,12 +16,16 @@ import {
 import { createUndoManager } from "@/board/history";
 import { BoardStore } from "@/board/store";
 import { screenToWorld, zoomAt, type Viewport } from "@/board/viewport";
+import { throttle } from "@/collab/presence";
 import { ElementShape, type ElementHandlers } from "./ElementShape";
+import { RemoteCursors } from "./RemoteCursors";
 import { TextEditor } from "./TextEditor";
 import { Toolbar, type Tool } from "./Toolbar";
 
 interface Props {
   doc: Y.Doc;
+  /** Presence channel. Optional so the canvas also works without a server. */
+  awareness?: Awareness;
 }
 
 const TOOL_KEYS: Record<string, Tool> = { v: "select", s: "sticky", r: "rect", o: "ellipse", t: "text" };
@@ -40,7 +45,7 @@ function isTyping(target: EventTarget | null) {
   return target instanceof HTMLElement && (target.isContentEditable || ["INPUT", "TEXTAREA"].includes(target.tagName));
 }
 
-export function BoardCanvas({ doc }: Props) {
+export function BoardCanvas({ doc, awareness }: Props) {
   // The store observes the doc for its whole lifetime; both are garbage
   // collected together, so there is nothing to tear down here.
   const store = useMemo(() => new BoardStore(doc), [doc]);
@@ -70,6 +75,23 @@ export function BoardCanvas({ doc }: Props) {
   useEffect(() => {
     selectionRef.current = liveSelection;
   }, [liveSelection]);
+
+  /* ------------------------------ presence -------------------------------- */
+
+  // Share what we have selected so others can see it.
+  useEffect(() => {
+    awareness?.setLocalStateField("selection", liveSelection);
+  }, [awareness, liveSelection]);
+
+  const publishCursor = useMemo(
+    () => throttle((cursor: { x: number; y: number } | null) => awareness?.setLocalStateField("cursor", cursor), 33),
+    [awareness],
+  );
+
+  const onPointerMove = () => {
+    const p = pointerWorld();
+    if (p) publishCursor(p);
+  };
 
   /* ---------------------------- element handlers --------------------------- */
 
@@ -269,6 +291,9 @@ export function BoardCanvas({ doc }: Props) {
           onMouseDown={onStagePointerDown}
           onTouchStart={onStagePointerDown}
           onWheel={onWheel}
+          onMouseMove={onPointerMove}
+          onTouchMove={onPointerMove}
+          onMouseLeave={() => publishCursor(null)}
           onDragMove={onStageDrag}
           onDragEnd={onStageDrag}
         >
@@ -290,6 +315,7 @@ export function BoardCanvas({ doc }: Props) {
               onTransformEnd={onTransformEnd}
             />
           </Layer>
+          {awareness && <RemoteCursors awareness={awareness} store={store} scale={viewport.scale} />}
         </Stage>
       )}
       {editing && (
