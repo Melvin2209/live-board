@@ -1,0 +1,40 @@
+{
+  "name": "live-board",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Real-time collaborative whiteboard built on a CRDT (Yjs).",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "dev": "concurrently -k -n web,ws -c blue,magenta \"next dev\" \"npm run dev:server\"",
+    "dev:server": "tsx watch server/index.ts",
+    "build": "next build",
+    "start": "concurrently -k -n web,ws \"next start\" \"npm run start:server\"",
+    "start:server": "tsx server/index.ts",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "next": "^16.4.2",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1",
+    "@types/node": "^22.20.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "concurrently": "^10.0.6",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^16.4.2",
+    "tsx": "^4.23.15",
+    "typescript": "~5.9.3",
+    "vitest": "^5.0.5"
+  }
+}
