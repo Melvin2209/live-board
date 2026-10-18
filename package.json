@@ -10,10 +10,10 @@
   },
   "scripts": {
     "dev": "concurrently -k -n web,ws -c blue,magenta \"next dev\" \"npm run dev:server\"",
-    "dev:server": "tsx watch server/index.ts",
+    "dev:server": "tsx watch --env-file-if-exists=.env --disable-warning=ExperimentalWarning server/index.ts",
     "build": "next build",
     "start": "concurrently -k -n web,ws \"next start\" \"npm run start:server\"",
-    "start:server": "tsx server/index.ts",
+    "start:server": "tsx --env-file-if-exists=.env --disable-warning=ExperimentalWarning server/index.ts",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
