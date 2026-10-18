@@ -276,7 +276,7 @@ export function BoardCanvas({ doc, awareness }: Props) {
         onRedo={history.canRedo ? () => undoManager.redo() : undefined}
       />
       <div className="element-count" data-testid="element-count">
-        {elements.length} elements
+        {elements.length} {elements.length === 1 ? "element" : "elements"}
       </div>
       {size.width > 0 && (
         <Stage
