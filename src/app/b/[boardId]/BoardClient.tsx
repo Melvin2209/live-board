@@ -2,7 +2,8 @@
 
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
-import { useBoardSession } from "@/collab/useBoardSession";
+import { seedBoard } from "@/board/seed";
+import { useBoardSession, type BoardSession } from "@/collab/useBoardSession";
 import { loadUser, saveUser, type UserInfo } from "@/collab/user";
 import { ConnectionBadge } from "@/components/ConnectionBadge";
 import { ShareButton } from "@/components/ShareButton";
@@ -13,8 +14,8 @@ const BoardCanvas = dynamic(() => import("@/components/BoardCanvas").then((m) =>
 
 declare global {
   interface Window {
-    /** Debug handle used by the e2e tests and the benchmark script. */
-    __liveBoard?: ReturnType<typeof useBoardSession>;
+    /** Debug handle used by the e2e tests and the benchmark. */
+    __liveBoard?: (BoardSession & { seed: (count: number) => void }) | null;
   }
 }
 
@@ -33,7 +34,11 @@ export function BoardClient({ boardId }: { boardId: string }) {
   }, [session, user]);
 
   useEffect(() => {
-    window.__liveBoard = session;
+    window.__liveBoard = session && {
+      ...session,
+      // Seeds around the screen center so the grid is centered at any zoom level.
+      seed: (count) => seedBoard(session.doc, count, { x: window.innerWidth / 2, y: window.innerHeight / 2 }),
+    };
   }, [session]);
 
   const rename = (name: string) => {

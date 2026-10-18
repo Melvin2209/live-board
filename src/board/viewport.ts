@@ -15,6 +15,11 @@ export interface Point {
 }
 
 export const MIN_SCALE = 0.1;
+/**
+ * Level of detail: below this zoom, text would be a few pixels tall and
+ * unreadable, so we skip drawing it (the most expensive part of a frame).
+ */
+export const TEXT_MIN_SCALE = 0.4;
 export const MAX_SCALE = 4;
 
 export function clampScale(scale: number): number {

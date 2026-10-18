@@ -18,7 +18,9 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "bench": "playwright test -c playwright.bench.config.ts",
+    "bench:doc": "tsx scripts/doc-stats.ts"
   },
   "dependencies": {
     "konva": "^10.9.0",

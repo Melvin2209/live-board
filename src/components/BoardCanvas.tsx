@@ -11,11 +11,13 @@ import {
   deleteElements,
   moveElements,
   updateElement,
+  type BoardElement,
   type ElementType,
 } from "@/board/model";
 import { createUndoManager } from "@/board/history";
+import { HotElements } from "@/board/hot";
 import { BoardStore } from "@/board/store";
-import { screenToWorld, zoomAt, type Viewport } from "@/board/viewport";
+import { screenToWorld, TEXT_MIN_SCALE, zoomAt, type Viewport } from "@/board/viewport";
 import { throttle } from "@/collab/presence";
 import { ElementShape, type ElementHandlers } from "./ElementShape";
 import { RemoteCursors } from "./RemoteCursors";
@@ -50,6 +52,8 @@ export function BoardCanvas({ doc, awareness }: Props) {
   // collected together, so there is nothing to tear down here.
   const store = useMemo(() => new BoardStore(doc), [doc]);
   const elements = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
+  const hot = useMemo(() => new HotElements(doc), [doc]);
+  const hotIds = useSyncExternalStore(hot.subscribe, hot.getSnapshot, hot.getSnapshot);
   const undoManager = useMemo(() => createUndoManager(doc), [doc]);
   const [history, setHistory] = useState({ canUndo: false, canRedo: false });
 
@@ -67,6 +71,8 @@ export function BoardCanvas({ doc, awareness }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const stageRef = useRef<Konva.Stage>(null);
+  const elementsLayerRef = useRef<Konva.Layer>(null);
+  const dragLayerRef = useRef<Konva.Layer>(null);
   const transformerRef = useRef<Konva.Transformer>(null);
 
   // Elements can be deleted by a collaborator: drop them from the selection.
@@ -129,19 +135,26 @@ export function BoardCanvas({ doc, awareness }: Props) {
         setSelection([id]);
         setEditingId(id);
       },
-      onDragStart: (id) => {
+      onDragStart: (_id, node) => {
         // Start a fresh undo step: the whole drag will be undone at once.
         undoManager.stopCapturing();
-        bringToFront(doc, id);
+        // While dragging, the element lives on its own small layer (drawn on
+        // top): each frame redraws 1 element instead of the whole board.
+        if (dragLayerRef.current) node.moveTo(dragLayerRef.current);
       },
       onDragMove: (id, x, y) => {
         pendingDrag.current = { id, x, y };
         dragFrame.current ??= requestAnimationFrame(flushDrag);
       },
-      onDragEnd: (id, x, y) => {
+      onDragEnd: (id, x, y, node) => {
         if (dragFrame.current !== null) cancelAnimationFrame(dragFrame.current);
         pendingDrag.current = { id, x, y };
         flushDrag();
+        // Back to the main layer, then bring it to the front for everyone.
+        // (Changing the z-order during the drag would make React re-insert
+        // the node into the main layer.)
+        if (elementsLayerRef.current) node.moveTo(elementsLayerRef.current);
+        bringToFront(doc, id);
       },
     }),
     [doc, flushDrag, undoManager],
@@ -250,6 +263,16 @@ export function BoardCanvas({ doc, awareness }: Props) {
 
   /* -------------------------------- render --------------------------------- */
 
+  const renderElement = (el: BoardElement) => (
+    <ElementShape
+      key={el.id}
+      element={el}
+      draggable={tool === "select" && editingId !== el.id}
+      showText={editingId !== el.id && viewport.scale >= TEXT_MIN_SCALE}
+      handlers={handlers}
+    />
+  );
+
   const editing = editingId ? store.get(editingId) : undefined;
   const selectedColor = liveSelection.length ? store.get(liveSelection[0])?.color : undefined;
 
@@ -297,16 +320,11 @@ export function BoardCanvas({ doc, awareness }: Props) {
           onDragMove={onStageDrag}
           onDragEnd={onStageDrag}
         >
-          <Layer>
-            {elements.map((el) => (
-              <ElementShape
-                key={el.id}
-                element={el}
-                draggable={tool === "select" && editingId !== el.id}
-                hideText={editingId === el.id}
-                handlers={handlers}
-              />
-            ))}
+          {/* Main layer: everything that is not moving right now. */}
+          <Layer ref={elementsLayerRef}>{elements.filter((el) => !hotIds.has(el.id)).map(renderElement)}</Layer>
+          {/* Active layer: elements others are editing, the one we drag, resize handles. */}
+          <Layer ref={dragLayerRef}>
+            {elements.filter((el) => hotIds.has(el.id)).map(renderElement)}
             <Transformer
               ref={transformerRef}
               rotateEnabled={false}
