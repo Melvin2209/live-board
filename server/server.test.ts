@@ -5,7 +5,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import WebSocket from "ws";
 import { WebsocketProvider } from "y-websocket";
 import * as Y from "yjs";
-import { createElement, listElements, moveElements } from "../src/board/model";
+import { createElement, listElements, moveElements, updateElement } from "../src/board/model";
 import { startServer, type RunningServer } from "./server";
 
 /** Poll until `check` passes (network sync is asynchronous). */
@@ -97,6 +97,27 @@ describe("sync server", () => {
 
     const late = connect("persist-test");
     await eventually(() => expect(listElements(late.doc)[0]).toMatchObject({ text: "survives restart", x: 7 }));
+  });
+
+  it("merges edits made offline once the client reconnects", async () => {
+    const alice = connect("offline-test");
+    const bob = connect("offline-test");
+    const id = createElement(alice.doc, { type: "sticky", x: 0, y: 0, text: "plan" });
+    await eventually(() => expect(listElements(bob.doc)).toHaveLength(1));
+
+    bob.provider.disconnect(); // Bob loses the network
+    moveElements(bob.doc, [id], 100, 0);
+    createElement(bob.doc, { type: "rect", x: 0, y: 0, id: "made-offline" });
+    updateElement(alice.doc, id, { color: "#86efac" }); // Alice keeps working online
+    await new Promise((r) => setTimeout(r, 100));
+    expect(listElements(alice.doc)).toHaveLength(1); // Bob's edits did not reach her
+
+    bob.provider.connect(); // back online: both sides exchange what they missed
+    await eventually(() => {
+      expect(listElements(alice.doc)).toHaveLength(2);
+      expect(listElements(alice.doc)).toEqual(listElements(bob.doc));
+      expect(listElements(bob.doc).find((e) => e.id === id)).toMatchObject({ x: 100, color: "#86efac" });
+    });
   });
 
   it("rejects invalid board ids", async () => {

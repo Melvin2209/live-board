@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { useBoardSession } from "@/collab/useBoardSession";
 import { loadUser, saveUser, type UserInfo } from "@/collab/user";
+import { ConnectionBadge } from "@/components/ConnectionBadge";
 import { ShareButton } from "@/components/ShareButton";
 import { TopBar } from "@/components/TopBar";
 
@@ -46,6 +47,7 @@ export function BoardClient({ boardId }: { boardId: string }) {
     <main>
       {user && (
         <TopBar boardId={boardId} user={user} onRename={rename} awareness={session?.provider.awareness}>
+          <ConnectionBadge provider={session?.provider} />
           <ShareButton />
         </TopBar>
       )}

@@ -158,3 +158,9 @@ body {
 .cta:hover { background: #4338ca; }
 .features { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; list-style: none; padding: 0; margin: 0; }
 .features li { padding: 6px 12px; background: #fff; border-radius: 999px; font-size: 14px; box-shadow: 0 0 0 1px #0000000f; }
+
+.connection { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #4b5563; padding: 0 4px; }
+.connection .dot { width: 8px; height: 8px; border-radius: 50%; background: #9ca3af; }
+.connection[data-status="online"] .dot { background: #10b981; }
+.connection[data-status="connecting"] .dot { background: #f59e0b; }
+.connection[data-status="offline"] .dot { background: #ef4444; }

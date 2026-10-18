@@ -28,6 +28,7 @@
     "react-dom": "^19.3.1",
     "react-konva": "^19.3.2",
     "ws": "^8.22.0",
+    "y-indexeddb": "^9.0.12",
     "y-protocols": "^1.0.7",
     "y-websocket": "^3.1.0",
     "yjs": "^13.6.33"
@@ -41,6 +42,7 @@
     "concurrently": "^10.0.6",
     "eslint": "^9.39.5",
     "eslint-config-next": "^16.4.2",
+    "fake-indexeddb": "^6.2.6",
     "tsx": "^4.23.15",
     "typescript": "~5.9.3",
     "vitest": "^5.0.5"
